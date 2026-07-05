@@ -498,6 +498,71 @@ function NotificationBell() {
   );
 }
 
+// ─── Install App Button ───
+function InstallAppButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+
+    // Detect if app was installed
+    window.addEventListener("appinstalled", () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    });
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      // Fallback: show instructions
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        alert('To install: Tap the Share button (⬆️) in Safari, then "Add to Home Screen"');
+      } else {
+        alert('To install: Open the browser menu (⋮) and look for "Install app" or "Add to Home Screen"');
+      }
+      return;
+    }
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
+  };
+
+  if (isInstalled) return null;
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="rounded-xl"
+      onClick={handleInstall}
+      title="Install App"
+    >
+      <Download className="w-5 h-5" />
+    </Button>
+  );
+}
+
 // ─── Dashboard View ───
 function DashboardView() {
   const { budget, expenses, analytics } = useAppStore();
@@ -1355,51 +1420,7 @@ function MainApp() {
           <div className="flex items-center gap-2">
             <BudgetSettingDialog />
             <NotificationBell />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-xl"
-              onClick={() => {
-                const state = useAppStore.getState();
-                const exps = state.expenses;
-                const bgt = state.budget;
-                const selMonth = state.selectedMonth;
-                const selYear = state.selectedYear;
-                if (exps.length === 0) {
-                  alert("No expenses to download");
-                  return;
-                }
-                const header = "Date,Category,Note,Amount (₹)";
-                const rows = exps
-                  .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                  .map((e: any) => {
-                    const d = new Date(e.date).toLocaleDateString("en-IN");
-                    const note = (e.note || "").replace(/,/g, "; ").replace(/"/g, "'");
-                    return `${d},${e.category},"${note}",${e.amount}`;
-                  });
-                const total = exps.reduce((s: number, e: any) => s + e.amount, 0);
-                const summary = [
-                  "",
-                  "--- Summary ---",
-                  `Month,${getMonthName(selMonth)} ${selYear}`,
-                  `Budget,₹${bgt?.amount || 0}`,
-                  `Total Spent,₹${total}`,
-                  `Remaining,₹${(bgt?.amount || 0) - total}`,
-                  `Number of Expenses,${exps.length}`,
-                ];
-                const csv = [header, ...rows, ...summary].join("\n");
-                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `budget-${getMonthName(selMonth)}-${selYear}.csv`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              title="Download CSV"
-            >
-              <Download className="w-5 h-5" />
-            </Button>
+            <InstallAppButton />
             {mounted && (
               <Button
                 variant="ghost"
