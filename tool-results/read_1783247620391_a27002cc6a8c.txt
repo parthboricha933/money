@@ -1,0 +1,1635 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useState, useCallback } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import {
+     6→  Wallet, TrendingDown, TrendingUp, Calendar, PieChart, History,
+     7→  Lightbulb, Bell, Plus, Edit3, Trash2, Search, Filter, Moon, Sun,
+     8→  LogOut, ChevronLeft, ChevronRight, X, Check, AlertTriangle, 
+     9→  IndianRupee, Target, Clock, BarChart3, ArrowUpRight, ArrowDownRight,
+    10→  Settings, Eye, ChevronDown
+    11→} from "lucide-react";
+    12→import { useTheme } from "next-themes";
+    13→import { useAppStore, CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS, type Category, type ViewTab } from "@/lib/store";
+    14→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    15→import { Button } from "@/components/ui/button";
+    16→import { Input } from "@/components/ui/input";
+    17→import { Label } from "@/components/ui/label";
+    18→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    19→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+    20→import { Progress } from "@/components/ui/progress";
+    21→import { Badge } from "@/components/ui/badge";
+    22→import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    23→import { ScrollArea } from "@/components/ui/scroll-area";
+    24→import { Separator } from "@/components/ui/separator";
+    25→import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+    26→import {
+    27→  PieChart as RechartsPie, Pie, Cell, ResponsiveContainer,
+    28→  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    29→  LineChart, Line, AreaChart, Area, Legend
+    30→} from "recharts";
+    31→
+    32→// ─── Helper functions ───
+    33→function formatCurrency(amount: number): string {
+    34→  return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    35→}
+    36→
+    37→function getDaysInMonth(month: number, year: number): number {
+    38→  return new Date(year, month, 0).getDate();
+    39→}
+    40→
+    41→function getDaysRemaining(month: number, year: number): number {
+    42→  const now = new Date();
+    43→  const currentMonth = now.getMonth() + 1;
+    44→  const currentYear = now.getFullYear();
+    45→  if (month === currentMonth && year === currentYear) {
+    46→    const daysInMonth = getDaysInMonth(month, year);
+    47→    return daysInMonth - now.getDate() + 1;
+    48→  }
+    49→  if (year > currentYear || (year === currentYear && month > currentMonth)) {
+    50→    return getDaysInMonth(month, year);
+    51→  }
+    52→  return 0;
+    53→}
+    54→
+    55→function getTodaySpent(expenses: any[]): number {
+    56→  const today = new Date().toISOString().split("T")[0];
+    57→  return expenses
+    58→    .filter((e) => new Date(e.date).toISOString().split("T")[0] === today)
+    59→    .reduce((sum, e) => sum + e.amount, 0);
+    60→}
+    61→
+    62→function getMonthName(month: number): string {
+    63→  const months = ["January", "February", "March", "April", "May", "June",
+    64→    "July", "August", "September", "October", "November", "December"];
+    65→  return months[month - 1] || "";
+    66→}
+    67→
+    68→function getShortMonthName(month: number): string {
+    69→  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    70→    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    71→  return months[month - 1] || "";
+    72→}
+    73→
+    74→// ─── Auth Screen Component ───
+    75→function AuthScreen() {
+    76→  const [isLogin, setIsLogin] = useState(true);
+    77→  const [email, setEmail] = useState("");
+    78→  const [password, setPassword] = useState("");
+    79→  const [name, setName] = useState("");
+    80→  const [error, setError] = useState("");
+    81→  const [loading, setLoading] = useState(false);
+    82→
+    83→  const handleSubmit = async (e: React.FormEvent) => {
+    84→    e.preventDefault();
+    85→    setError("");
+    86→    setLoading(true);
+    87→
+    88→    try {
+    89→      if (isLogin) {
+    90→        const res = await fetch("/api/auth/callback/credentials", {
+    91→          method: "POST",
+    92→          headers: { "Content-Type": "application/json" },
+    93→          body: JSON.stringify({ email, password }),
+    94→        });
+    95→        if (res.ok) {
+    96→          window.location.reload();
+    97→        } else {
+    98→          setError("Invalid email or password");
+    99→        }
+   100→      } else {
+   101→        const res = await fetch("/api/auth/signup", {
+   102→          method: "POST",
+   103→          headers: { "Content-Type": "application/json" },
+   104→          body: JSON.stringify({ email, password, name }),
+   105→        });
+   106→        if (res.ok) {
+   107→          // Now sign in
+   108→          const signInRes = await fetch("/api/auth/callback/credentials", {
+   109→            method: "POST",
+   110→            headers: { "Content-Type": "application/json" },
+   111→            body: JSON.stringify({ email, password }),
+   112→          });
+   113→          if (signInRes.ok) {
+   114→            window.location.reload();
+   115→          } else {
+   116→            setError("Account created! Please sign in.");
+   117→            setIsLogin(true);
+   118→          }
+   119→        } else {
+   120→          const data = await res.json();
+   121→          setError(data.error || "Signup failed");
+   122→        }
+   123→      }
+   124→    } catch {
+   125→      setError("Something went wrong");
+   126→    } finally {
+   127→      setLoading(false);
+   128→    }
+   129→  };
+   130→
+   131→  return (
+   132→    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950 p-4">
+   133→      <motion.div
+   134→        initial={{ opacity: 0, y: 20 }}
+   135→        animate={{ opacity: 1, y: 0 }}
+   136→        className="w-full max-w-md"
+   137→      >
+   138→        <div className="text-center mb-8">
+   139→          <motion.div
+   140→            initial={{ scale: 0 }}
+   141→            animate={{ scale: 1 }}
+   142→            transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+   143→            className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/50"
+   144→          >
+   145→            <Wallet className="w-10 h-10 text-white" />
+   146→          </motion.div>
+   147→          <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+   148→            Smart Budget Tracker
+   149→          </h1>
+   150→          <p className="text-muted-foreground mt-2">
+   151→            Stay within your budget, every single day
+   152→          </p>
+   153→        </div>
+   154→
+   155→        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-white/20 dark:border-gray-800/50 shadow-2xl">
+   156→          <CardContent className="pt-6">
+   157→            <form onSubmit={handleSubmit} className="space-y-4">
+   158→              <div className="flex gap-2 mb-6 bg-muted rounded-xl p-1">
+   159→                <button
+   160→                  type="button"
+   161→                  onClick={() => { setIsLogin(true); setError(""); }}
+   162→                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+   163→                    isLogin ? "bg-white dark:bg-gray-800 shadow-sm" : "text-muted-foreground"
+   164→                  }`}
+   165→                >
+   166→                  Sign In
+   167→                </button>
+   168→                <button
+   169→                  type="button"
+   170→                  onClick={() => { setIsLogin(false); setError(""); }}
+   171→                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+   172→                    !isLogin ? "bg-white dark:bg-gray-800 shadow-sm" : "text-muted-foreground"
+   173→                  }`}
+   174→                >
+   175→                  Sign Up
+   176→                </button>
+   177→              </div>
+   178→
+   179→              {!isLogin && (
+   180→                <div className="space-y-2">
+   181→                  <Label htmlFor="name">Name</Label>
+   182→                  <Input
+   183→                    id="name"
+   184→                    placeholder="Your name"
+   185→                    value={name}
+   186→                    onChange={(e) => setName(e.target.value)}
+   187→                    className="rounded-xl"
+   188→                  />
+   189→                </div>
+   190→              )}
+   191→
+   192→              <div className="space-y-2">
+   193→                <Label htmlFor="email">Email</Label>
+   194→                <Input
+   195→                  id="email"
+   196→                  type="email"
+   197→                  placeholder="you@example.com"
+   198→                  value={email}
+   199→                  onChange={(e) => setEmail(e.target.value)}
+   200→                  required
+   201→                  className="rounded-xl"
+   202→                />
+   203→              </div>
+   204→
+   205→              <div className="space-y-2">
+   206→                <Label htmlFor="password">Password</Label>
+   207→                <Input
+   208→                  id="password"
+   209→                  type="password"
+   210→                  placeholder={isLogin ? "Enter password" : "At least 6 characters"}
+   211→                  value={password}
+   212→                  onChange={(e) => setPassword(e.target.value)}
+   213→                  required
+   214→                  minLength={6}
+   215→                  className="rounded-xl"
+   216→                />
+   217→              </div>
+   218→
+   219→              {error && (
+   220→                <motion.p
+   221→                  initial={{ opacity: 0 }}
+   222→                  animate={{ opacity: 1 }}
+   223→                  className="text-sm text-destructive bg-destructive/10 p-3 rounded-xl"
+   224→                >
+   225→                  {error}
+   226→                </motion.p>
+   227→              )}
+   228→
+   229→              <Button
+   230→                type="submit"
+   231→                className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30"
+   232→                disabled={loading}
+   233→              >
+   234→                {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
+   235→              </Button>
+   236→            </form>
+   237→          </CardContent>
+   238→        </Card>
+   239→      </motion.div>
+   240→    </div>
+   241→  );
+   242→}
+   243→
+   244→// ─── Stat Card Component ───
+   245→function StatCard({ title, value, icon: Icon, trend, color, subtitle }: {
+   246→  title: string;
+   247→  value: string;
+   248→  icon: any;
+   249→  trend?: "up" | "down" | "neutral";
+   250→  color: string;
+   251→  subtitle?: string;
+   252→}) {
+   253→  return (
+   254→    <motion.div
+   255→      initial={{ opacity: 0, y: 20 }}
+   256→      animate={{ opacity: 1, y: 0 }}
+   257→      whileHover={{ y: -2 }}
+   258→      transition={{ duration: 0.3 }}
+   259→    >
+   260→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+   261→        <CardContent className="p-5">
+   262→          <div className="flex items-start justify-between">
+   263→            <div className="space-y-1">
+   264→              <p className="text-sm text-muted-foreground font-medium">{title}</p>
+   265→              <p className="text-2xl font-bold tracking-tight">{value}</p>
+   266→              {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+   267→            </div>
+   268→            <div className={`p-2.5 rounded-xl ${color}`}>
+   269→              <Icon className="w-5 h-5 text-white" />
+   270→            </div>
+   271→          </div>
+   272→          {trend && (
+   273→            <div className="flex items-center mt-3 text-xs">
+   274→              {trend === "up" ? (
+   275→                <ArrowUpRight className="w-3 h-3 text-emerald-500 mr-1" />
+   276→              ) : trend === "down" ? (
+   277→                <ArrowDownRight className="w-3 h-3 text-red-500 mr-1" />
+   278→              ) : null}
+   279→              <span className={trend === "up" ? "text-emerald-500" : trend === "down" ? "text-red-500" : "text-muted-foreground"}>
+   280→                {trend === "up" ? "Under budget" : trend === "down" ? "Over budget" : "On track"}
+   281→              </span>
+   282→            </div>
+   283→          )}
+   284→        </CardContent>
+   285→      </Card>
+   286→    </motion.div>
+   287→  );
+   288→}
+   289→
+   290→// ─── Budget Status Card ───
+   291→function BudgetStatusCard({ budget, totalSpent, remaining, daysRemaining, todaySpent }: {
+   292→  budget: number;
+   293→  totalSpent: number;
+   294→  remaining: number;
+   295→  daysRemaining: number;
+   296→  todaySpent: number;
+   297→}) {
+   298→  const safeDailyLimit = daysRemaining > 0 ? remaining / daysRemaining : 0;
+   299→  const todayDifference = todaySpent - safeDailyLimit;
+   300→  const isOverBudget = todayDifference > 0;
+   301→  const percentage = budget > 0 ? (totalSpent / budget) * 100 : 0;
+   302→  
+   303→  // Projected savings
+   304→  const projectedEndOfMonth = daysRemaining > 0 
+   305→    ? totalSpent + (safeDailyLimit * daysRemaining) 
+   306→    : totalSpent;
+   307→  const projectedSavings = budget - projectedEndOfMonth;
+   308→
+   309→  return (
+   310→    <motion.div
+   311→      initial={{ opacity: 0, y: 20 }}
+   312→      animate={{ opacity: 1, y: 0 }}
+   313→    >
+   314→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg overflow-hidden">
+   315→        <CardHeader className="pb-3">
+   316→          <CardTitle className="text-lg flex items-center gap-2">
+   317→            <Target className="w-5 h-5 text-emerald-500" />
+   318→            Financial Insight
+   319→          </CardTitle>
+   320→        </CardHeader>
+   321→        <CardContent className="space-y-4">
+   322→          {/* Budget usage progress */}
+   323→          <div className="space-y-2">
+   324→            <div className="flex justify-between text-sm">
+   325→              <span className="text-muted-foreground">Budget Usage</span>
+   326→              <span className={`font-semibold ${percentage > 90 ? "text-red-500" : percentage > 75 ? "text-amber-500" : "text-emerald-500"}`}>
+   327→                {percentage.toFixed(1)}%
+   328→              </span>
+   329→            </div>
+   330→            <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+   331→              <motion.div
+   332→                initial={{ width: 0 }}
+   333→                animate={{ width: `${Math.min(percentage, 100)}%` }}
+   334→                transition={{ duration: 1, ease: "easeOut" }}
+   335→                className={`h-full rounded-full ${
+   336→                  percentage > 90 ? "bg-gradient-to-r from-red-500 to-red-600" :
+   337→                  percentage > 75 ? "bg-gradient-to-r from-amber-500 to-orange-500" :
+   338→                  percentage > 50 ? "bg-gradient-to-r from-yellow-500 to-amber-500" :
+   339→                  "bg-gradient-to-r from-emerald-500 to-teal-500"
+   340→                }`}
+   341→              />
+   342→            </div>
+   343→          </div>
+   344→
+   345→          {/* Insight grid */}
+   346→          <div className="grid grid-cols-2 gap-3">
+   347→            <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-3">
+   348→              <p className="text-xs text-muted-foreground">Monthly Budget</p>
+   349→              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(budget)}</p>
+   350→            </div>
+   351→            <div className="bg-red-50 dark:bg-red-950/30 rounded-xl p-3">
+   352→              <p className="text-xs text-muted-foreground">Spent</p>
+   353→              <p className="text-lg font-bold text-red-700 dark:text-red-400">{formatCurrency(totalSpent)}</p>
+   354→            </div>
+   355→            <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-3">
+   356→              <p className="text-xs text-muted-foreground">Remaining</p>
+   357→              <p className="text-lg font-bold text-blue-700 dark:text-blue-400">{formatCurrency(remaining)}</p>
+   358→            </div>
+   359→            <div className="bg-purple-50 dark:bg-purple-950/30 rounded-xl p-3">
+   360→              <p className="text-xs text-muted-foreground">Days Left</p>
+   361→              <p className="text-lg font-bold text-purple-700 dark:text-purple-400">{daysRemaining}</p>
+   362→            </div>
+   363→          </div>
+   364→
+   365→          {/* Daily limit */}
+   366→          <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-4 space-y-2">
+   367→            <div className="flex items-center gap-2">
+   368→              <IndianRupee className="w-4 h-4 text-emerald-600" />
+   369→              <span className="text-sm font-medium">Safe Daily Limit</span>
+   370→            </div>
+   371→            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+   372→              {formatCurrency(Math.round(safeDailyLimit))}<span className="text-sm font-normal text-muted-foreground">/day</span>
+   373→            </p>
+   374→            <div className="flex items-center gap-2 text-sm">
+   375→              <span className="text-muted-foreground">Today&apos;s Spending:</span>
+   376→              <span className="font-semibold">{formatCurrency(todaySpent)}</span>
+   377→            </div>
+   378→          </div>
+   379→
+   380→          {/* Status indicator */}
+   381→          <div className={`rounded-xl p-4 ${
+   382→            isOverBudget 
+   383→              ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
+   384→              : "bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800"
+   385→          }`}>
+   386→            <div className="flex items-center gap-2">
+   387→              <span className="text-lg">{isOverBudget ? "🔴" : "🟢"}</span>
+   388→              <div>
+   389→                {isOverBudget ? (
+   390→                  <div>
+   391→                    <p className="font-semibold text-red-700 dark:text-red-400">
+   392→                      You spent more than today&apos;s recommended budget
+   393→                    </p>
+   394→                    <p className="text-sm text-red-600 dark:text-red-500">
+   395→                      You&apos;re {formatCurrency(Math.round(todayDifference))} over today&apos;s limit. 
+   396→                      New daily limit: {formatCurrency(Math.round(daysRemaining > 1 ? (remaining - todaySpent) / (daysRemaining - 1) : 0))}/day
+   397→                    </p>
+   398→                  </div>
+   399→                ) : (
+   400→                  <div>
+   401→                    <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+   402→                      Great! You are {formatCurrency(Math.round(Math.abs(todayDifference)))} under today&apos;s recommended limit
+   403→                    </p>
+   404→                    <p className="text-sm text-emerald-600 dark:text-emerald-500">
+   405→                      If you continue at this pace, you will finish the month with approximately {formatCurrency(Math.round(Math.max(0, projectedSavings)))} saved.
+   406→                    </p>
+   407→                  </div>
+   408→                )}
+   409→              </div>
+   410→            </div>
+   411→          </div>
+   412→        </CardContent>
+   413→      </Card>
+   414→    </motion.div>
+   415→  );
+   416→}
+   417→
+   418→// ─── Add/Edit Expense Dialog ───
+   419→function ExpenseFormDialog() {
+   420→  const { showAddExpense, setShowAddExpense, editingExpense, setEditingExpense, addExpense, updateExpense } = useAppStore();
+   421→  const isOpen = showAddExpense || !!editingExpense;
+   422→  const [amount, setAmount] = useState("");
+   423→  const [category, setCategory] = useState<Category>("Food");
+   424→  const [note, setNote] = useState("");
+   425→  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+   426→  const [loading, setLoading] = useState(false);
+   427→  const [prevEditingId, setPrevEditingId] = useState<string | null>(null);
+   428→  const [prevShowAdd, setPrevShowAdd] = useState(false);
+   429→
+   430→  // Sync form when dialog opens/changes - using ref pattern to avoid setState-in-effect
+   431→  if (editingExpense && editingExpense.id !== prevEditingId) {
+   432→    setAmount(editingExpense.amount.toString());
+   433→    setCategory(editingExpense.category);
+   434→    setNote(editingExpense.note);
+   435→    setDate(new Date(editingExpense.date).toISOString().split("T")[0]);
+   436→    setPrevEditingId(editingExpense.id);
+   437→    setPrevShowAdd(false);
+   438→  } else if (showAddExpense && !prevShowAdd && !editingExpense) {
+   439→    setAmount("");
+   440→    setCategory("Food");
+   441→    setNote("");
+   442→    setDate(new Date().toISOString().split("T")[0]);
+   443→    setPrevShowAdd(true);
+   444→    setPrevEditingId(null);
+   445→  } else if (!showAddExpense && !editingExpense) {
+   446→    if (prevShowAdd) setPrevShowAdd(false);
+   447→    if (prevEditingId) setPrevEditingId(null);
+   448→  }
+   449→
+   450→  const handleSubmit = async (e: React.FormEvent) => {
+   451→    e.preventDefault();
+   452→    setLoading(true);
+   453→
+   454→    if (editingExpense) {
+   455→      await updateExpense(editingExpense.id, {
+   456→        amount: parseFloat(amount),
+   457→        category,
+   458→        note,
+   459→        date,
+   460→      });
+   461→      setEditingExpense(null);
+   462→    } else {
+   463→      await addExpense({
+   464→        amount: parseFloat(amount),
+   465→        category,
+   466→        note,
+   467→        date,
+   468→      });
+   469→      setShowAddExpense(false);
+   470→    }
+   471→
+   472→    setLoading(false);
+   473→    setAmount("");
+   474→    setCategory("Food");
+   475→    setNote("");
+   476→    setDate(new Date().toISOString().split("T")[0]);
+   477→  };
+   478→
+   479→  return (
+   480→    <Dialog open={isOpen} onOpenChange={(open) => {
+   481→      if (!open) {
+   482→        setShowAddExpense(false);
+   483→        setEditingExpense(null);
+   484→      }
+   485→    }}>
+   486→      <DialogContent className="sm:max-w-md backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-white/20 dark:border-gray-800/50">
+   487→        <DialogHeader>
+   488→          <DialogTitle className="flex items-center gap-2">
+   489→            {editingExpense ? <Edit3 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+   490→            {editingExpense ? "Edit Expense" : "Add Expense"}
+   491→          </DialogTitle>
+   492→        </DialogHeader>
+   493→        <form onSubmit={handleSubmit} className="space-y-4">
+   494→          <div className="space-y-2">
+   495→            <Label>Amount (₹)</Label>
+   496→            <Input
+   497→              type="number"
+   498→              step="0.01"
+   499→              min="0"
+   500→              placeholder="0"
+   501→              value={amount}
+   502→              onChange={(e) => setAmount(e.target.value)}
+   503→              required
+   504→              className="rounded-xl text-lg"
+   505→            />
+   506→          </div>
+   507→          <div className="space-y-2">
+   508→            <Label>Category</Label>
+   509→            <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+   510→              <SelectTrigger className="rounded-xl">
+   511→                <SelectValue />
+   512→              </SelectTrigger>
+   513→              <SelectContent>
+   514→                {CATEGORIES.map((cat) => (
+   515→                  <SelectItem key={cat} value={cat}>
+   516→                    <span className="flex items-center gap-2">
+   517→                      <span>{CATEGORY_ICONS[cat]}</span>
+   518→                      <span>{cat}</span>
+   519→                    </span>
+   520→                  </SelectItem>
+   521→                ))}
+   522→              </SelectContent>
+   523→            </Select>
+   524→          </div>
+   525→          <div className="space-y-2">
+   526→            <Label>Note</Label>
+   527→            <Input
+   528→              placeholder="What was this for?"
+   529→              value={note}
+   530→              onChange={(e) => setNote(e.target.value)}
+   531→              className="rounded-xl"
+   532→            />
+   533→          </div>
+   534→          <div className="space-y-2">
+   535→            <Label>Date</Label>
+   536→            <Input
+   537→              type="date"
+   538→              value={date}
+   539→              onChange={(e) => setDate(e.target.value)}
+   540→              required
+   541→              className="rounded-xl"
+   542→            />
+   543→          </div>
+   544→          <Button
+   545→            type="submit"
+   546→            className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
+   547→            disabled={loading || !amount}
+   548→          >
+   549→            {loading ? "Saving..." : editingExpense ? "Update Expense" : "Add Expense"}
+   550→          </Button>
+   551→        </form>
+   552→      </DialogContent>
+   553→    </Dialog>
+   554→  );
+   555→}
+   556→
+   557→// ─── Budget Setting Dialog ───
+   558→function BudgetSettingDialog() {
+   559→  const { budget, setBudget, selectedMonth, selectedYear } = useAppStore();
+   560→  const [amount, setAmount] = useState("");
+   561→  const [open, setOpen] = useState(false);
+   562→  const [prevOpen, setPrevOpen] = useState(false);
+   563→
+   564→  if (open && !prevOpen) {
+   565→    setAmount(budget ? budget.amount.toString() : "");
+   566→    setPrevOpen(true);
+   567→  } else if (!open && prevOpen) {
+   568→    setPrevOpen(false);
+   569→  }
+   570→
+   571→  const handleSubmit = async (e: React.FormEvent) => {
+   572→    e.preventDefault();
+   573→    await setBudget(parseFloat(amount) || 0);
+   574→    setOpen(false);
+   575→  };
+   576→
+   577→  return (
+   578→    <Dialog open={open} onOpenChange={setOpen}>
+   579→      <DialogTrigger asChild>
+   580→        <Button variant="outline" size="sm" className="rounded-xl gap-2 backdrop-blur-sm bg-white/50 dark:bg-gray-800/50">
+   581→          <Settings className="w-4 h-4" />
+   582→          Set Budget
+   583→        </Button>
+   584→      </DialogTrigger>
+   585→      <DialogContent className="sm:max-w-md backdrop-blur-xl bg-white/90 dark:bg-gray-900/90">
+   586→        <DialogHeader>
+   587→          <DialogTitle>Set Monthly Budget for {getMonthName(selectedMonth)} {selectedYear}</DialogTitle>
+   588→        </DialogHeader>
+   589→        <form onSubmit={handleSubmit} className="space-y-4">
+   590→          <div className="space-y-2">
+   591→            <Label>Budget Amount (₹)</Label>
+   592→            <Input
+   593→              type="number"
+   594→              step="1"
+   595→              min="0"
+   596→              placeholder="e.g., 3000"
+   597→              value={amount}
+   598→              onChange={(e) => setAmount(e.target.value)}
+   599→              required
+   600→              className="rounded-xl text-lg"
+   601→            />
+   602→          </div>
+   603→          <Button
+   604→            type="submit"
+   605→            className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
+   606→          >
+   607→            Save Budget
+   608→          </Button>
+   609→        </form>
+   610→      </DialogContent>
+   611→    </Dialog>
+   612→  );
+   613→}
+   614→
+   615→// ─── Notification Bell ───
+   616→function NotificationBell() {
+   617→  const { notifications, markNotificationRead } = useAppStore();
+   618→  const unreadCount = notifications.filter((n) => !n.read).length;
+   619→
+   620→  return (
+   621→    <Popover>
+   622→      <PopoverTrigger asChild>
+   623→        <Button variant="ghost" size="icon" className="relative rounded-xl">
+   624→          <Bell className="w-5 h-5" />
+   625→          {unreadCount > 0 && (
+   626→            <motion.span
+   627→              initial={{ scale: 0 }}
+   628→              animate={{ scale: 1 }}
+   629→              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center"
+   630→            >
+   631→              {unreadCount}
+   632→            </motion.span>
+   633→          )}
+   634→        </Button>
+   635→      </PopoverTrigger>
+   636→      <PopoverContent className="w-80 p-0 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90" align="end">
+   637→        <div className="p-4 border-b">
+   638→          <h3 className="font-semibold">Notifications</h3>
+   639→        </div>
+   640→        <ScrollArea className="max-h-64">
+   641→          {notifications.length === 0 ? (
+   642→            <p className="p-4 text-sm text-muted-foreground text-center">No notifications yet</p>
+   643→          ) : (
+   644→            notifications.map((n) => (
+   645→              <div
+   646→                key={n.id}
+   647→                className={`p-3 border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors ${!n.read ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}`}
+   648→                onClick={() => !n.read && markNotificationRead(n.id)}
+   649→              >
+   650→                <div className="flex items-start gap-2">
+   651→                  <span className="text-lg">
+   652→                    {n.type === "100" ? "🔴" : n.type === "90" ? "🟠" : n.type === "75" ? "🟡" : "🟢"}
+   653→                  </span>
+   654→                  <div className="flex-1">
+   655→                    <p className="text-sm">{n.message}</p>
+   656→                    <p className="text-xs text-muted-foreground mt-1">
+   657→                      {new Date(n.createdAt).toLocaleDateString()}
+   658→                    </p>
+   659→                  </div>
+   660→                  {!n.read && <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1" />}
+   661→                </div>
+   662→              </div>
+   663→            ))
+   664→          )}
+   665→        </ScrollArea>
+   666→      </PopoverContent>
+   667→    </Popover>
+   668→  );
+   669→}
+   670→
+   671→// ─── Dashboard View ───
+   672→function DashboardView() {
+   673→  const { budget, expenses, analytics } = useAppStore();
+   674→  const { selectedMonth, selectedYear } = useAppStore();
+   675→
+   676→  const budgetAmount = budget?.amount || analytics?.budget || 0;
+   677→  const totalSpent = analytics?.totalSpent || 0;
+   678→  const remaining = analytics?.remaining || 0;
+   679→  const daysRemaining = getDaysRemaining(selectedMonth, selectedYear);
+   680→  const todaySpent = getTodaySpent(expenses);
+   681→
+   682→  return (
+   683→    <div className="space-y-6">
+   684→      {/* Stat Cards Grid */}
+   685→      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+   686→        <StatCard
+   687→          title="Monthly Budget"
+   688→          value={formatCurrency(budgetAmount)}
+   689→          icon={Wallet}
+   690→          color="bg-gradient-to-br from-emerald-500 to-teal-600"
+   691→        />
+   692→        <StatCard
+   693→          title="Total Spent"
+   694→          value={formatCurrency(totalSpent)}
+   695→          icon={TrendingDown}
+   696→          color="bg-gradient-to-br from-red-500 to-rose-600"
+   697→          trend={totalSpent > budgetAmount ? "down" : "up"}
+   698→        />
+   699→        <StatCard
+   700→          title="Remaining"
+   701→          value={formatCurrency(remaining)}
+   702→          icon={TrendingUp}
+   703→          color="bg-gradient-to-br from-blue-500 to-indigo-600"
+   704→          trend={remaining > 0 ? "up" : "down"}
+   705→        />
+   706→        <StatCard
+   707→          title="Days Left"
+   708→          value={daysRemaining.toString()}
+   709→          icon={Calendar}
+   710→          color="bg-gradient-to-br from-purple-500 to-violet-600"
+   711→          subtitle={`of ${getDaysInMonth(selectedMonth, selectedYear)} days`}
+   712→        />
+   713→        <StatCard
+   714→          title="Today's Spending"
+   715→          value={formatCurrency(todaySpent)}
+   716→          icon={Clock}
+   717→          color="bg-gradient-to-br from-amber-500 to-orange-600"
+   718→        />
+   719→        <StatCard
+   720→          title="Safe Daily Limit"
+   721→          value={daysRemaining > 0 ? `${formatCurrency(Math.round(remaining / daysRemaining))}` : "₹0"}
+   722→          icon={Target}
+   723→          color="bg-gradient-to-br from-cyan-500 to-teal-600"
+   724→          subtitle="per day remaining"
+   725→        />
+   726→      </div>
+   727→
+   728→      {/* Financial Insight Card */}
+   729→      <BudgetStatusCard
+   730→        budget={budgetAmount}
+   731→        totalSpent={totalSpent}
+   732→        remaining={remaining}
+   733→        daysRemaining={daysRemaining}
+   734→        todaySpent={todaySpent}
+   735→      />
+   736→
+   737→      {/* Recent Expenses */}
+   738→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+   739→        <CardHeader className="pb-3">
+   740→          <CardTitle className="text-lg flex items-center gap-2">
+   741→            <BarChart3 className="w-5 h-5 text-emerald-500" />
+   742→            Recent Expenses
+   743→          </CardTitle>
+   744→        </CardHeader>
+   745→        <CardContent>
+   746→          {expenses.length === 0 ? (
+   747→            <div className="text-center py-8 text-muted-foreground">
+   748→              <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   749→              <p>No expenses yet. Add your first expense!</p>
+   750→            </div>
+   751→          ) : (
+   752→            <div className="space-y-2">
+   753→              {expenses.slice(0, 5).map((expense) => (
+   754→                <motion.div
+   755→                  key={expense.id}
+   756→                  initial={{ opacity: 0, x: -10 }}
+   757→                  animate={{ opacity: 1, x: 0 }}
+   758→                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors"
+   759→                >
+   760→                  <span className="text-xl">{CATEGORY_ICONS[expense.category as Category]}</span>
+   761→                  <div className="flex-1 min-w-0">
+   762→                    <p className="font-medium text-sm truncate">{expense.note || expense.category}</p>
+   763→                    <p className="text-xs text-muted-foreground">
+   764→                      {new Date(expense.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+   765→                    </p>
+   766→                  </div>
+   767→                  <span className="font-semibold text-sm text-red-600 dark:text-red-400">
+   768→                    -{formatCurrency(expense.amount)}
+   769→                  </span>
+   770→                </motion.div>
+   771→              ))}
+   772→            </div>
+   773→          )}
+   774→        </CardContent>
+   775→      </Card>
+   776→    </div>
+   777→  );
+   778→}
+   779→
+   780→// ─── Expenses View ───
+   781→function ExpensesView() {
+   782→  const { expenses, deleteExpense, setEditingExpense, searchQuery, setSearchQuery, filterCategory, setFilterCategory } = useAppStore();
+   783→
+   784→  const filtered = expenses.filter((e) => {
+   785→    const matchesSearch = !searchQuery || 
+   786→      e.note.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   787→      e.category.toLowerCase().includes(searchQuery.toLowerCase());
+   788→    const matchesCategory = filterCategory === "all" || e.category === filterCategory;
+   789→    return matchesSearch && matchesCategory;
+   790→  });
+   791→
+   792→  return (
+   793→    <div className="space-y-4">
+   794→      {/* Search and Filter */}
+   795→      <div className="flex gap-3 flex-col sm:flex-row">
+   796→        <div className="relative flex-1">
+   797→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   798→          <Input
+   799→            placeholder="Search expenses..."
+   800→            value={searchQuery}
+   801→            onChange={(e) => setSearchQuery(e.target.value)}
+   802→            className="pl-10 rounded-xl"
+   803→          />
+   804→        </div>
+   805→        <Select value={filterCategory} onValueChange={setFilterCategory}>
+   806→          <SelectTrigger className="w-full sm:w-44 rounded-xl">
+   807→            <Filter className="w-4 h-4 mr-2" />
+   808→            <SelectValue placeholder="Category" />
+   809→          </SelectTrigger>
+   810→          <SelectContent>
+   811→            <SelectItem value="all">All Categories</SelectItem>
+   812→            {CATEGORIES.map((cat) => (
+   813→              <SelectItem key={cat} value={cat}>
+   814→                {CATEGORY_ICONS[cat]} {cat}
+   815→              </SelectItem>
+   816→            ))}
+   817→          </SelectContent>
+   818→        </Select>
+   819→      </div>
+   820→
+   821→      {/* Expenses List */}
+   822→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+   823→        <CardContent className="p-0">
+   824→          {filtered.length === 0 ? (
+   825→            <div className="text-center py-12 text-muted-foreground">
+   826→              <Search className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   827→              <p>No expenses found</p>
+   828→              <p className="text-sm mt-1">Try adjusting your search or filters</p>
+   829→            </div>
+   830→          ) : (
+   831→            <ScrollArea className="max-h-[60vh]">
+   832→              <div className="divide-y">
+   833→                {filtered.map((expense, i) => (
+   834→                  <motion.div
+   835→                    key={expense.id}
+   836→                    initial={{ opacity: 0, y: 10 }}
+   837→                    animate={{ opacity: 1, y: 0 }}
+   838→                    transition={{ delay: i * 0.03 }}
+   839→                    className="flex items-center gap-3 p-4 hover:bg-muted/30 transition-colors"
+   840→                  >
+   841→                    <div
+   842→                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+   843→                      style={{ backgroundColor: `${CATEGORY_COLORS[expense.category as Category]}20` }}
+   844→                    >
+   845→                      {CATEGORY_ICONS[expense.category as Category]}
+   846→                    </div>
+   847→                    <div className="flex-1 min-w-0">
+   848→                      <p className="font-medium text-sm truncate">{expense.note || expense.category}</p>
+   849→                      <div className="flex items-center gap-2">
+   850→                        <Badge variant="secondary" className="text-xs rounded-lg">
+   851→                          {expense.category}
+   852→                        </Badge>
+   853→                        <span className="text-xs text-muted-foreground">
+   854→                          {new Date(expense.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+   855→                        </span>
+   856→                      </div>
+   857→                    </div>
+   858→                    <span className="font-semibold text-red-600 dark:text-red-400">
+   859→                      {formatCurrency(expense.amount)}
+   860→                    </span>
+   861→                    <div className="flex gap-1">
+   862→                      <Button
+   863→                        variant="ghost"
+   864→                        size="icon"
+   865→                        className="h-8 w-8 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30"
+   866→                        onClick={() => setEditingExpense(expense)}
+   867→                      >
+   868→                        <Edit3 className="w-3.5 h-3.5 text-blue-500" />
+   869→                      </Button>
+   870→                      <Button
+   871→                        variant="ghost"
+   872→                        size="icon"
+   873→                        className="h-8 w-8 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30"
+   874→                        onClick={() => deleteExpense(expense.id)}
+   875→                      >
+   876→                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+   877→                      </Button>
+   878→                    </div>
+   879→                  </motion.div>
+   880→                ))}
+   881→              </div>
+   882→            </ScrollArea>
+   883→          )}
+   884→        </CardContent>
+   885→      </Card>
+   886→    </div>
+   887→  );
+   888→}
+   889→
+   890→// ─── Analytics View ───
+   891→function AnalyticsView() {
+   892→  const { analytics, budget } = useAppStore();
+   893→  const { selectedMonth, selectedYear } = useAppStore();
+   894→
+   895→  if (!analytics || analytics.budget === 0) {
+   896→    return (
+   897→      <div className="text-center py-12 text-muted-foreground">
+   898→        <PieChart className="w-12 h-12 mx-auto mb-3 opacity-30" />
+   899→        <p>No data to analyze yet</p>
+   900→        <p className="text-sm mt-1">Set a budget and add expenses to see analytics</p>
+   901→      </div>
+   902→    );
+   903→  }
+   904→
+   905→  const categoryData = Object.entries(analytics.categoryBreakdown).map(([name, value]) => ({
+   906→    name,
+   907→    value: Math.round(value),
+   908→    color: CATEGORY_COLORS[name as Category] || "#6b7280",
+   909→  }));
+   910→
+   911→  const dailyData = Array.from({ length: getDaysInMonth(selectedMonth, selectedYear) }, (_, i) => {
+   912→    const day = i + 1;
+   913→    const found = analytics.dailySpending.find((d) => d.day === day);
+   914→    return { day, amount: found ? Math.round(found.amount) : 0 };
+   915→  });
+   916→
+   917→  const weeklyData = analytics.weeklySpending.map((w) => ({
+   918→    ...w,
+   919→    amount: Math.round(w.amount),
+   920→  }));
+   921→
+   922→  const percentage = analytics.budget > 0 ? (analytics.totalSpent / analytics.budget) * 100 : 0;
+   923→
+   924→  return (
+   925→    <div className="space-y-6">
+   926→      {/* Budget Usage Gauge */}
+   927→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+   928→        <CardHeader className="pb-3">
+   929→          <CardTitle className="text-lg">Budget Usage</CardTitle>
+   930→        </CardHeader>
+   931→        <CardContent>
+   932→          <div className="flex items-center justify-center">
+   933→            <div className="relative w-48 h-48">
+   934→              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+   935→                <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
+   936→                <circle
+   937→                  cx="50" cy="50" r="40" fill="none"
+   938→                  stroke={percentage > 90 ? "#ef4444" : percentage > 75 ? "#f59e0b" : percentage > 50 ? "#eab308" : "#10b981"}
+   939→                  strokeWidth="8"
+   940→                  strokeDasharray={`${(Math.min(percentage, 100) / 100) * 251.3} 251.3`}
+   941→                  strokeLinecap="round"
+   942→                  className="transition-all duration-1000"
+   943→                />
+   944→              </svg>
+   945→              <div className="absolute inset-0 flex flex-col items-center justify-center">
+   946→                <span className="text-3xl font-bold">{percentage.toFixed(0)}%</span>
+   947→                <span className="text-xs text-muted-foreground">used</span>
+   948→              </div>
+   949→            </div>
+   950→          </div>
+   951→          <div className="flex justify-center gap-6 mt-4 text-sm">
+   952→            <div className="text-center">
+   953→              <p className="text-muted-foreground">Spent</p>
+   954→              <p className="font-bold text-red-500">{formatCurrency(analytics.totalSpent)}</p>
+   955→            </div>
+   956→            <div className="text-center">
+   957→              <p className="text-muted-foreground">Budget</p>
+   958→              <p className="font-bold text-emerald-500">{formatCurrency(analytics.budget)}</p>
+   959→            </div>
+   960→            <div className="text-center">
+   961→              <p className="text-muted-foreground">Left</p>
+   962→              <p className="font-bold text-blue-500">{formatCurrency(analytics.remaining)}</p>
+   963→            </div>
+   964→          </div>
+   965→        </CardContent>
+   966→      </Card>
+   967→
+   968→      {/* Category Pie Chart */}
+   969→      {categoryData.length > 0 && (
+   970→        <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+   971→          <CardHeader className="pb-3">
+   972→            <CardTitle className="text-lg">Spending by Category</CardTitle>
+   973→          </CardHeader>
+   974→          <CardContent>
+   975→            <div className="flex flex-col lg:flex-row items-center gap-4">
+   976→              <div className="w-full lg:w-1/2 h-64">
+   977→                <ResponsiveContainer width="100%" height="100%">
+   978→                  <RechartsPie>
+   979→                    <Pie
+   980→                      data={categoryData}
+   981→                      cx="50%"
+   982→                      cy="50%"
+   983→                      innerRadius={60}
+   984→                      outerRadius={90}
+   985→                      paddingAngle={4}
+   986→                      dataKey="value"
+   987→                    >
+   988→                      {categoryData.map((entry, index) => (
+   989→                        <Cell key={index} fill={entry.color} />
+   990→                      ))}
+   991→                    </Pie>
+   992→                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+   993→                  </RechartsPie>
+   994→                </ResponsiveContainer>
+   995→              </div>
+   996→              <div className="w-full lg:w-1/2 space-y-2">
+   997→                {categoryData.map((item) => (
+   998→                  <div key={item.name} className="flex items-center gap-3">
+   999→                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+  1000→                    <span className="text-sm flex-1">{CATEGORY_ICONS[item.name as Category]} {item.name}</span>
+  1001→                    <span className="text-sm font-semibold">{formatCurrency(item.value)}</span>
+  1002→                  </div>
+  1003→                ))}
+  1004→              </div>
+  1005→            </div>
+  1006→          </CardContent>
+  1007→        </Card>
+  1008→      )}
+  1009→
+  1010→      {/* Daily Spending Chart */}
+  1011→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+  1012→        <CardHeader className="pb-3">
+  1013→          <CardTitle className="text-lg">Daily Spending</CardTitle>
+  1014→        </CardHeader>
+  1015→        <CardContent>
+  1016→          <div className="h-64">
+  1017→            <ResponsiveContainer width="100%" height="100%">
+  1018→              <BarChart data={dailyData}>
+  1019→                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+  1020→                <XAxis dataKey="day" tick={{ fontSize: 10 }} interval={2} />
+  1021→                <YAxis tick={{ fontSize: 10 }} />
+  1022→                <Tooltip formatter={(value: number) => formatCurrency(value)} labelFormatter={(label) => `Day ${label}`} />
+  1023→                <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
+  1024→              </BarChart>
+  1025→            </ResponsiveContainer>
+  1026→          </div>
+  1027→        </CardContent>
+  1028→      </Card>
+  1029→
+  1030→      {/* Weekly Spending Chart */}
+  1031→      {weeklyData.length > 0 && (
+  1032→        <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+  1033→          <CardHeader className="pb-3">
+  1034→            <CardTitle className="text-lg">Weekly Spending</CardTitle>
+  1035→          </CardHeader>
+  1036→          <CardContent>
+  1037→            <div className="h-48">
+  1038→              <ResponsiveContainer width="100%" height="100%">
+  1039→                <BarChart data={weeklyData}>
+  1040→                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+  1041→                  <XAxis dataKey="week" />
+  1042→                  <YAxis tick={{ fontSize: 10 }} />
+  1043→                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+  1044→                  <Bar dataKey="amount" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+  1045→                </BarChart>
+  1046→              </ResponsiveContainer>
+  1047→            </div>
+  1048→          </CardContent>
+  1049→        </Card>
+  1050→      )}
+  1051→
+  1052→      {/* Monthly Trend (Area) */}
+  1053→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+  1054→        <CardHeader className="pb-3">
+  1055→          <CardTitle className="text-lg">Monthly Spending Trend</CardTitle>
+  1056→        </CardHeader>
+  1057→        <CardContent>
+  1058→          <div className="h-48">
+  1059→            <ResponsiveContainer width="100%" height="100%">
+  1060→              <AreaChart data={dailyData.filter((d) => d.amount > 0)}>
+  1061→                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+  1062→                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+  1063→                <YAxis tick={{ fontSize: 10 }} />
+  1064→                <Tooltip formatter={(value: number) => formatCurrency(value)} labelFormatter={(label) => `Day ${label}`} />
+  1065→                <Area type="monotone" dataKey="amount" stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} />
+  1066→              </AreaChart>
+  1067→            </ResponsiveContainer>
+  1068→          </div>
+  1069→        </CardContent>
+  1070→      </Card>
+  1071→    </div>
+  1072→  );
+  1073→}
+  1074→
+  1075→// ─── Calendar View ───
+  1076→function CalendarView() {
+  1077→  const { expenses, selectedMonth, selectedYear, setSelectedMonth, setSelectedYear } = useAppStore();
+  1078→  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  1079→
+  1080→  const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+  1081→  const firstDay = new Date(selectedYear, selectedMonth - 1, 1).getDay();
+  1082→
+  1083→  // Group expenses by day
+  1084→  const expensesByDay: Record<number, typeof expenses> = {};
+  1085→  expenses.forEach((e) => {
+  1086→    const day = new Date(e.date).getDate();
+  1087→    if (!expensesByDay[day]) expensesByDay[day] = [];
+  1088→    expensesByDay[day].push(e);
+  1089→  });
+  1090→
+  1091→  const dailyTotals: Record<number, number> = {};
+  1092→  expenses.forEach((e) => {
+  1093→    const day = new Date(e.date).getDate();
+  1094→    dailyTotals[day] = (dailyTotals[day] || 0) + e.amount;
+  1095→  });
+  1096→
+  1097→  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  1098→  const blanks = Array.from({ length: firstDay }, (_, i) => i);
+  1099→
+  1100→  const selectedDayExpenses = selectedDate ? (expensesByDay[selectedDate] || []) : [];
+  1101→
+  1102→  return (
+  1103→    <div className="space-y-4">
+  1104→      {/* Month Navigation */}
+  1105→      <div className="flex items-center justify-between">
+  1106→        <Button
+  1107→          variant="ghost"
+  1108→          size="icon"
+  1109→          className="rounded-xl"
+  1110→          onClick={() => {
+  1111→            if (selectedMonth === 1) {
+  1112→              setSelectedMonth(12);
+  1113→              setSelectedYear(selectedYear - 1);
+  1114→            } else {
+  1115→              setSelectedMonth(selectedMonth - 1);
+  1116→            }
+  1117→            setSelectedDate(null);
+  1118→          }}
+  1119→        >
+  1120→          <ChevronLeft className="w-5 h-5" />
+  1121→        </Button>
+  1122→        <h3 className="text-lg font-semibold">
+  1123→          {getMonthName(selectedMonth)} {selectedYear}
+  1124→        </h3>
+  1125→        <Button
+  1126→          variant="ghost"
+  1127→          size="icon"
+  1128→          className="rounded-xl"
+  1129→          onClick={() => {
+  1130→            if (selectedMonth === 12) {
+  1131→              setSelectedMonth(1);
+  1132→              setSelectedYear(selectedYear + 1);
+  1133→            } else {
+  1134→              setSelectedMonth(selectedMonth + 1);
+  1135→            }
+  1136→            setSelectedDate(null);
+  1137→          }}
+  1138→        >
+  1139→          <ChevronRight className="w-5 h-5" />
+  1140→        </Button>
+  1141→      </div>
+  1142→
+  1143→      {/* Calendar Grid */}
+  1144→      <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+  1145→        <CardContent className="p-4">
+  1146→          {/* Day headers */}
+  1147→          <div className="grid grid-cols-7 gap-1 mb-2">
+  1148→            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+  1149→              <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">
+  1150→                {d}
+  1151→              </div>
+  1152→            ))}
+  1153→          </div>
+  1154→          {/* Calendar days */}
+  1155→          <div className="grid grid-cols-7 gap-1">
+  1156→            {blanks.map((_, i) => (
+  1157→              <div key={`blank-${i}`} />
+  1158→            ))}
+  1159→            {days.map((day) => {
+  1160→              const hasExpenses = expensesByDay[day] && expensesByDay[day].length > 0;
+  1161→              const total = dailyTotals[day] || 0;
+  1162→              const isToday = day === new Date().getDate() && selectedMonth === new Date().getMonth() + 1 && selectedYear === new Date().getFullYear();
+  1163→              const isSelected = day === selectedDate;
+  1164→
+  1165→              return (
+  1166→                <motion.button
+  1167→                  key={day}
+  1168→                  whileHover={{ scale: 1.05 }}
+  1169→                  whileTap={{ scale: 0.95 }}
+  1170→                  onClick={() => setSelectedDate(day === selectedDate ? null : day)}
+  1171→                  className={`relative p-1.5 rounded-xl text-sm transition-all aspect-square flex flex-col items-center justify-center ${
+  1172→                    isSelected
+  1173→                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/50"
+  1174→                      : isToday
+  1175→                      ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+  1176→                      : "hover:bg-muted/50"
+  1177→                  }`}
+  1178→                >
+  1179→                  <span className="font-medium text-xs">{day}</span>
+  1180→                  {hasExpenses && (
+  1181→                    <div className={`flex gap-0.5 mt-0.5`}>
+  1182→                      <div className={`w-1 h-1 rounded-full ${isSelected ? "bg-white" : "bg-emerald-500"}`} />
+  1183→                    </div>
+  1184→                  )}
+  1185→                  {hasExpenses && (
+  1186→                    <span className={`text-[9px] ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>
+  1187→                      {total >= 1000 ? `${(total / 1000).toFixed(0)}k` : total}
+  1188→                    </span>
+  1189→                  )}
+  1190→                </motion.button>
+  1191→              );
+  1192→            })}
+  1193→          </div>
+  1194→        </CardContent>
+  1195→      </Card>
+  1196→
+  1197→      {/* Selected Day Expenses */}
+  1198→      {selectedDate && (
+  1199→        <motion.div
+  1200→          initial={{ opacity: 0, y: 10 }}
+  1201→          animate={{ opacity: 1, y: 0 }}
+  1202→        >
+  1203→          <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+  1204→            <CardHeader className="pb-3">
+  1205→              <CardTitle className="text-lg">
+  1206→                {getMonthName(selectedMonth)} {selectedDate}, {selectedYear}
+  1207→                <span className="text-sm font-normal text-muted-foreground ml-2">
+  1208→                  Total: {formatCurrency(dailyTotals[selectedDate] || 0)}
+  1209→                </span>
+  1210→              </CardTitle>
+  1211→            </CardHeader>
+  1212→            <CardContent>
+  1213→              {selectedDayExpenses.length === 0 ? (
+  1214→                <p className="text-sm text-muted-foreground text-center py-4">No expenses on this day</p>
+  1215→              ) : (
+  1216→                <div className="space-y-2">
+  1217→                  {selectedDayExpenses.map((e) => (
+  1218→                    <div key={e.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted/30">
+  1219→                      <span>{CATEGORY_ICONS[e.category as Category]}</span>
+  1220→                      <div className="flex-1">
+  1221→                        <p className="text-sm font-medium">{e.note || e.category}</p>
+  1222→                        <Badge variant="secondary" className="text-xs rounded-lg">{e.category}</Badge>
+  1223→                      </div>
+  1224→                      <span className="font-semibold text-sm">{formatCurrency(e.amount)}</span>
+  1225→                    </div>
+  1226→                  ))}
+  1227→                </div>
+  1228→              )}
+  1229→            </CardContent>
+  1230→          </Card>
+  1231→        </motion.div>
+  1232→      )}
+  1233→    </div>
+  1234→  );
+  1235→}
+  1236→
+  1237→// ─── History View ───
+  1238→function HistoryView() {
+  1239→  const { fetchBudget, fetchExpenses, fetchAnalytics, setSelectedMonth, setSelectedYear } = useAppStore();
+  1240→  const [historyMonths, setHistoryMonths] = useState<{ month: number; year: number; budget: number; spent: number }[]>([]);
+  1241→  const [selectedHistoryMonth, setSelectedHistoryMonth] = useState<{ month: number; year: number } | null>(null);
+  1242→
+  1243→  const loadHistory = useCallback(async () => {
+  1244→    const now = new Date();
+  1245→    const months = [];
+  1246→    for (let i = 0; i < 12; i++) {
+  1247→      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  1248→      const m = d.getMonth() + 1;
+  1249→      const y = d.getFullYear();
+  1250→      try {
+  1251→        const budgetRes = await fetch(`/api/budget?month=${m}&year=${y}`);
+  1252→        const analyticsRes = await fetch(`/api/analytics?month=${m}&year=${y}`);
+  1253→        if (budgetRes.ok && analyticsRes.ok) {
+  1254→          const budgets = await budgetRes.json();
+  1255→          const analytics = await analyticsRes.json();
+  1256→          const b = budgets.find((b: any) => b.month === m && b.year === y);
+  1257→          if (b || analytics.totalSpent > 0) {
+  1258→            months.push({
+  1259→              month: m,
+  1260→              year: y,
+  1261→              budget: b?.amount || 0,
+  1262→              spent: analytics.totalSpent || 0,
+  1263→            });
+  1264→          }
+  1265→        }
+  1266→      } catch (e) {
+  1267→        // skip
+  1268→      }
+  1269→    }
+  1270→    setHistoryMonths(months);
+  1271→  }, []);
+  1272→
+  1273→  // eslint-disable-next-line react-hooks/set-state-in-effect
+  1274→  useEffect(() => { loadHistory(); }, [loadHistory]);
+  1275→
+  1276→  const switchToMonth = (month: number, year: number) => {
+  1277→    setSelectedMonth(month);
+  1278→    setSelectedYear(year);
+  1279→    fetchBudget(month, year);
+  1280→    fetchExpenses(month, year);
+  1281→    fetchAnalytics(month, year);
+  1282→  };
+  1283→
+  1284→  return (
+  1285→    <div className="space-y-4">
+  1286→      <h3 className="text-lg font-semibold flex items-center gap-2">
+  1287→        <History className="w-5 h-5 text-emerald-500" />
+  1288→        Monthly History
+  1289→      </h3>
+  1290→      {historyMonths.length === 0 ? (
+  1291→        <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+  1292→          <CardContent className="py-12 text-center text-muted-foreground">
+  1293→            <History className="w-12 h-12 mx-auto mb-3 opacity-30" />
+  1294→            <p>No history yet</p>
+  1295→          </CardContent>
+  1296→        </Card>
+  1297→      ) : (
+  1298→        <div className="space-y-3">
+  1299→          {historyMonths.map((m, i) => {
+  1300→            const savings = m.budget - m.spent;
+  1301→            const percentage = m.budget > 0 ? (m.spent / m.budget) * 100 : 0;
+  1302→            return (
+  1303→              <motion.div
+  1304→                key={`${m.month}-${m.year}`}
+  1305→                initial={{ opacity: 0, x: -10 }}
+  1306→                animate={{ opacity: 1, x: 0 }}
+  1307→                transition={{ delay: i * 0.05 }}
+  1308→              >
+  1309→                <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg hover:shadow-xl transition-all cursor-pointer"
+  1310→                  onClick={() => switchToMonth(m.month, m.year)}
+  1311→                >
+  1312→                  <CardContent className="p-4">
+  1313→                    <div className="flex items-center justify-between mb-3">
+  1314→                      <div>
+  1315→                        <p className="font-semibold">{getMonthName(m.month)} {m.year}</p>
+  1316→                        <p className="text-xs text-muted-foreground">
+  1317→                          Budget: {formatCurrency(m.budget)} | Spent: {formatCurrency(m.spent)}
+  1318→                        </p>
+  1319→                      </div>
+  1320→                      <div className="text-right">
+  1321→                        <p className={`font-bold ${savings >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+  1322→                          {savings >= 0 ? "+" : ""}{formatCurrency(savings)}
+  1323→                        </p>
+  1324→                        <p className="text-xs text-muted-foreground">
+  1325→                          {percentage.toFixed(0)}% used
+  1326→                        </p>
+  1327→                      </div>
+  1328→                    </div>
+  1329→                    <Progress value={Math.min(percentage, 100)} className="h-2" />
+  1330→                  </CardContent>
+  1331→                </Card>
+  1332→              </motion.div>
+  1333→            );
+  1334→          })}
+  1335→        </div>
+  1336→      )}
+  1337→    </div>
+  1338→  );
+  1339→}
+  1340→
+  1341→// ─── Savings Insights View ───
+  1342→function InsightsView() {
+  1343→  const { analytics, expenses, selectedMonth, selectedYear, budget } = useAppStore();
+  1344→
+  1345→  if (!analytics || !budget) {
+  1346→    return (
+  1347→      <div className="text-center py-12 text-muted-foreground">
+  1348→        <Lightbulb className="w-12 h-12 mx-auto mb-3 opacity-30" />
+  1349→        <p>Set a budget and add expenses to see insights</p>
+  1350→      </div>
+  1351→    );
+  1352→  }
+  1353→
+  1354→  const totalSpent = analytics.totalSpent;
+  1355→  const totalBudget = analytics.budget;
+  1356→  const totalSaved = totalBudget - totalSpent;
+  1357→  const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+  1358→  const daysWithExpenses = analytics.dailySpending.length;
+  1359→  const avgDailySpending = daysWithExpenses > 0 ? totalSpent / daysWithExpenses : 0;
+  1360→  const savingPercentage = totalBudget > 0 ? (totalSaved / totalBudget) * 100 : 0;
+  1361→
+  1362→  // Highest/lowest spending day
+  1363→  let highestDay = { day: 0, amount: 0 };
+  1364→  let lowestDay = { day: 0, amount: Infinity };
+  1365→  analytics.dailySpending.forEach((d) => {
+  1366→    if (d.amount > highestDay.amount) highestDay = d;
+  1367→    if (d.amount < lowestDay.amount) lowestDay = d;
+  1368→  });
+  1369→  if (lowestDay.amount === Infinity) lowestDay = { day: 0, amount: 0 };
+  1370→
+  1371→  // Most expensive category
+  1372→  let mostExpensiveCategory = { name: "None", amount: 0 };
+  1373→  Object.entries(analytics.categoryBreakdown).forEach(([name, amount]) => {
+  1374→    if (amount > mostExpensiveCategory.amount) {
+  1375→      mostExpensiveCategory = { name, amount };
+  1376→    }
+  1377→  });
+  1378→
+  1379→  const insights = [
+  1380→    {
+  1381→      label: "Total Saved",
+  1382→      value: formatCurrency(Math.max(0, totalSaved)),
+  1383→      icon: TrendingUp,
+  1384→      color: totalSaved >= 0 ? "text-emerald-600" : "text-red-600",
+  1385→      bgColor: totalSaved >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30",
+  1386→    },
+  1387→    {
+  1388→      label: "Average Daily Spending",
+  1389→      value: formatCurrency(Math.round(avgDailySpending)),
+  1390→      icon: BarChart3,
+  1391→      color: "text-blue-600 dark:text-blue-400",
+  1392→      bgColor: "bg-blue-50 dark:bg-blue-950/30",
+  1393→    },
+  1394→    {
+  1395→      label: "Highest Spending Day",
+  1396→      value: highestDay.day ? `Day ${highestDay.day} - ${formatCurrency(highestDay.amount)}` : "N/A",
+  1397→      icon: ArrowUpRight,
+  1398→      color: "text-red-600 dark:text-red-400",
+  1399→      bgColor: "bg-red-50 dark:bg-red-950/30",
+  1400→    },
+  1401→    {
+  1402→      label: "Lowest Spending Day",
+  1403→      value: lowestDay.day ? `Day ${lowestDay.day} - ${formatCurrency(lowestDay.amount)}` : "N/A",
+  1404→      icon: ArrowDownRight,
+  1405→      color: "text-emerald-600 dark:text-emerald-400",
+  1406→      bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
+  1407→    },
+  1408→    {
+  1409→      label: "Most Expensive Category",
+  1410→      value: mostExpensiveCategory.name !== "None" ? `${CATEGORY_ICONS[mostExpensiveCategory.name as Category]} ${mostExpensiveCategory.name} (${formatCurrency(mostExpensiveCategory.amount)})` : "N/A",
+  1411→      icon: PieChart,
+  1412→      color: "text-purple-600 dark:text-purple-400",
+  1413→      bgColor: "bg-purple-50 dark:bg-purple-950/30",
+  1414→    },
+  1415→    {
+  1416→      label: "Monthly Saving Percentage",
+  1417→      value: `${savingPercentage.toFixed(1)}%`,
+  1418→      icon: Target,
+  1419→      color: savingPercentage >= 0 ? "text-emerald-600" : "text-red-600",
+  1420→      bgColor: savingPercentage >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30",
+  1421→    },
+  1422→  ];
+  1423→
+  1424→  return (
+  1425→    <div className="space-y-4">
+  1426→      <h3 className="text-lg font-semibold flex items-center gap-2">
+  1427→        <Lightbulb className="w-5 h-5 text-amber-500" />
+  1428→        Savings Insights for {getMonthName(selectedMonth)} {selectedYear}
+  1429→      </h3>
+  1430→      <div className="grid gap-3">
+  1431→        {insights.map((insight, i) => (
+  1432→          <motion.div
+  1433→            key={insight.label}
+  1434→            initial={{ opacity: 0, y: 10 }}
+  1435→            animate={{ opacity: 1, y: 0 }}
+  1436→            transition={{ delay: i * 0.08 }}
+  1437→          >
+  1438→            <Card className="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-white/20 dark:border-gray-800/50 shadow-lg">
+  1439→              <CardContent className="p-4">
+  1440→                <div className="flex items-center gap-4">
+  1441→                  <div className={`p-3 rounded-xl ${insight.bgColor}`}>
+  1442→                    <insight.icon className={`w-5 h-5 ${insight.color}`} />
+  1443→                  </div>
+  1444→                  <div className="flex-1">
+  1445→                    <p className="text-sm text-muted-foreground">{insight.label}</p>
+  1446→                    <p className={`font-semibold ${insight.color}`}>{insight.value}</p>
+  1447→                  </div>
+  1448→                </div>
+  1449→              </CardContent>
+  1450→            </Card>
+  1451→          </motion.div>
+  1452→        ))}
+  1453→      </div>
+  1454→    </div>
+  1455→  );
+  1456→}
+  1457→
+  1458→// ─── Main App Shell ───
+  1459→function MainApp() {
+  1460→  const {
+  1461→    currentTab, setCurrentTab,
+  1462→    selectedMonth, selectedYear,
+  1463→    showAddExpense, setShowAddExpense,
+  1464→    fetchBudget, fetchExpenses, fetchAnalytics, fetchNotifications,
+  1465→    checkAuth, isAuthenticated, isLoading,
+  1466→    budget,
+  1467→  } = useAppStore();
+  1468→  const { theme, setTheme } = useTheme();
+  1469→  const [mounted, setMounted] = useState(false);
+  1470→
+  1471→  // eslint-disable-next-line react-hooks/set-state-in-effect
+  1472→  useEffect(() => { setMounted(true); }, []);
+  1473→
+  1474→  useEffect(() => {
+  1475→    checkAuth();
+  1476→  }, []);
+  1477→
+  1478→  useEffect(() => {
+  1479→    if (isAuthenticated) {
+  1480→      fetchBudget();
+  1481→      fetchExpenses();
+  1482→      fetchAnalytics();
+  1483→      fetchNotifications();
+  1484→    }
+  1485→  }, [isAuthenticated, selectedMonth, selectedYear]);
+  1486→
+  1487→  if (isLoading) {
+  1488→    return (
+  1489→      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950">
+  1490→        <motion.div
+  1491→          animate={{ rotate: 360 }}
+  1492→          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+  1493→          className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"
+  1494→        />
+  1495→      </div>
+  1496→    );
+  1497→  }
+  1498→
+  1499→  if (!isAuthenticated) {
+  1500→    return <AuthScreen />;
+  1501→  }
+  1502→
+  1503→  const tabs: { id: ViewTab; label: string; icon: any }[] = [
+  1504→    { id: "dashboard", label: "Dashboard", icon: Wallet },
+  1505→    { id: "expenses", label: "Expenses", icon: TrendingDown },
+  1506→    { id: "analytics", label: "Analytics", icon: PieChart },
+  1507→    { id: "calendar", label: "Calendar", icon: Calendar },
+  1508→    { id: "history", label: "History", icon: History },
+  1509→    { id: "insights", label: "Insights", icon: Lightbulb },
+  1510→  ];
+  1511→
+  1512→  return (
+  1513→    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950">
+  1514→      {/* Header */}
+  1515→      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-b border-white/20 dark:border-gray-800/50 shadow-sm">
+  1516→        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+  1517→          <div className="flex items-center gap-2">
+  1518→            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+  1519→              <Wallet className="w-4 h-4 text-white" />
+  1520→            </div>
+  1521→            <h1 className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent hidden sm:block">
+  1522→              Smart Budget
+  1523→            </h1>
+  1524→          </div>
+  1525→
+  1526→          <div className="flex items-center gap-2">
+  1527→            <BudgetSettingDialog />
+  1528→            <NotificationBell />
+  1529→            {mounted && (
+  1530→              <Button
+  1531→                variant="ghost"
+  1532→                size="icon"
+  1533→                className="rounded-xl"
+  1534→                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+  1535→              >
+  1536→                {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+  1537→              </Button>
+  1538→            )}
+  1539→            <Button
+  1540→              variant="ghost"
+  1541→              size="icon"
+  1542→              className="rounded-xl"
+  1543→              onClick={async () => {
+  1544→                await fetch("/api/auth/signout", { method: "POST" });
+  1545→                window.location.reload();
+  1546→              }}
+  1547→            >
+  1548→              <LogOut className="w-5 h-5" />
+  1549→            </Button>
+  1550→          </div>
+  1551→        </div>
+  1552→      </header>
+  1553→
+  1554→      {/* Main Content */}
+  1555→      <main className="max-w-4xl mx-auto px-4 py-6 pb-24">
+  1556→        <AnimatePresence mode="wait">
+  1557→          <motion.div
+  1558→            key={currentTab}
+  1559→            initial={{ opacity: 0, y: 10 }}
+  1560→            animate={{ opacity: 1, y: 0 }}
+  1561→            exit={{ opacity: 0, y: -10 }}
+  1562→            transition={{ duration: 0.2 }}
+  1563→          >
+  1564→            {currentTab === "dashboard" && <DashboardView />}
+  1565→            {currentTab === "expenses" && <ExpensesView />}
+  1566→            {currentTab === "analytics" && <AnalyticsView />}
+  1567→            {currentTab === "calendar" && <CalendarView />}
+  1568→            {currentTab === "history" && <HistoryView />}
+  1569→            {currentTab === "insights" && <InsightsView />}
+  1570→          </motion.div>
+  1571→        </AnimatePresence>
+  1572→      </main>
+  1573→
+  1574→      {/* FAB - Add Expense */}
+  1575→      <motion.button
+  1576→        whileHover={{ scale: 1.1 }}
+  1577→        whileTap={{ scale: 0.9 }}
+  1578→        onClick={() => setShowAddExpense(true)}
+  1579→        className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg shadow-emerald-300 dark:shadow-emerald-900/50 flex items-center justify-center text-white"
+  1580→      >
+  1581→        <Plus className="w-6 h-6" />
+  1582→      </motion.button>
+  1583→
+  1584→      {/* Bottom Navigation */}
+  1585→      <nav className="fixed bottom-0 left-0 right-0 z-50 backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-t border-white/20 dark:border-gray-800/50 shadow-lg">
+  1586→        <div className="max-w-4xl mx-auto flex justify-around py-2 px-2">
+  1587→          {tabs.map((tab) => (
+  1588→            <button
+  1589→              key={tab.id}
+  1590→              onClick={() => setCurrentTab(tab.id)}
+  1591→              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all ${
+  1592→                currentTab === tab.id
+  1593→                  ? "text-emerald-600 dark:text-emerald-400"
+  1594→                  : "text-muted-foreground hover:text-foreground"
+  1595→              }`}
+  1596→            >
+  1597→              <tab.icon className={`w-5 h-5 ${currentTab === tab.id ? "text-emerald-600 dark:text-emerald-400" : ""}`} />
+  1598→              <span className="text-[10px] font-medium">{tab.label}</span>
+  1599→              {currentTab === tab.id && (
+  1600→                <motion.div
+  1601→                  layoutId="activeTab"
+  1602→                  className="w-4 h-0.5 rounded-full bg-emerald-500 mt-0.5"
+  1603→                />
+  1604→              )}
+  1605→            </button>
+  1606→          ))}
+  1607→        </div>
+  1608→      </nav>
+  1609→
+  1610→      {/* Expense Form Dialog */}
+  1611→      <ExpenseFormDialog />
+  1612→    </div>
+  1613→  );
+  1614→}
+  1615→
+  1616→// ─── Page Entry ───
+  1617→export default function Home() {
+  1618→  return (
+  1619→    <ThemeProvider>
+  1620→      <MainApp />
+  1621→    </ThemeProvider>
+  1622→  );
+  1623→}
+  1624→
+  1625→// ─── Theme Provider Wrapper ───
+  1626→import { ThemeProvider as NextThemesProvider } from "next-themes";
+  1627→
+  1628→function ThemeProvider({ children }: { children: React.ReactNode }) {
+  1629→  return (
+  1630→    <NextThemesProvider attribute="class" defaultTheme="light" enableSystem={false}>
+  1631→      {children}
+  1632→    </NextThemesProvider>
+  1633→  );
+  1634→}
+  1635→
