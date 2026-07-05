@@ -114,4 +114,6 @@ Stage Summary:
 - Login panel completely removed - app auto-creates default user and auto-logs in
 - GitHub repo updated: https://github.com/parthboricha933/money
 - Vercel project renamed to "money" locally, needs to be updated in Vercel dashboard
-- User needs to manually trigger redeploy on Vercel or provide Vercel token
+- Deployed to Vercel with new token, project renamed to "money"
+- Production URL: https://my-project-three-pink-18.vercel.app
+- Auto-login tested and working on production
