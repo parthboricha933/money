@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Wallet, TrendingDown, TrendingUp, Calendar, PieChart, History,
   Lightbulb, Bell, Plus, Edit3, Trash2, Search, Filter, Moon, Sun,
-  ChevronLeft, ChevronRight, X, Check, AlertTriangle, 
+  Download, ChevronLeft, ChevronRight, X, Check, AlertTriangle, 
   IndianRupee, Target, Clock, BarChart3, ArrowUpRight, ArrowDownRight,
   Settings, Eye, ChevronDown
 } from "lucide-react";
@@ -1355,6 +1355,51 @@ function MainApp() {
           <div className="flex items-center gap-2">
             <BudgetSettingDialog />
             <NotificationBell />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-xl"
+              onClick={() => {
+                const state = useAppStore.getState();
+                const exps = state.expenses;
+                const bgt = state.budget;
+                const selMonth = state.selectedMonth;
+                const selYear = state.selectedYear;
+                if (exps.length === 0) {
+                  alert("No expenses to download");
+                  return;
+                }
+                const header = "Date,Category,Note,Amount (₹)";
+                const rows = exps
+                  .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map((e: any) => {
+                    const d = new Date(e.date).toLocaleDateString("en-IN");
+                    const note = (e.note || "").replace(/,/g, "; ").replace(/"/g, "'");
+                    return `${d},${e.category},"${note}",${e.amount}`;
+                  });
+                const total = exps.reduce((s: number, e: any) => s + e.amount, 0);
+                const summary = [
+                  "",
+                  "--- Summary ---",
+                  `Month,${getMonthName(selMonth)} ${selYear}`,
+                  `Budget,₹${bgt?.amount || 0}`,
+                  `Total Spent,₹${total}`,
+                  `Remaining,₹${(bgt?.amount || 0) - total}`,
+                  `Number of Expenses,${exps.length}`,
+                ];
+                const csv = [header, ...rows, ...summary].join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `budget-${getMonthName(selMonth)}-${selYear}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              title="Download CSV"
+            >
+              <Download className="w-5 h-5" />
+            </Button>
             {mounted && (
               <Button
                 variant="ghost"
