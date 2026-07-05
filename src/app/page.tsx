@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Wallet, TrendingDown, TrendingUp, Calendar, PieChart, History,
   Lightbulb, Bell, Plus, Edit3, Trash2, Search, Filter, Moon, Sun,
-  LogOut, ChevronLeft, ChevronRight, X, Check, AlertTriangle, 
+  ChevronLeft, ChevronRight, X, Check, AlertTriangle, 
   IndianRupee, Target, Clock, BarChart3, ArrowUpRight, ArrowDownRight,
   Settings, Eye, ChevronDown
 } from "lucide-react";
@@ -69,177 +69,6 @@ function getShortMonthName(month: number): string {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return months[month - 1] || "";
-}
-
-// ─── Auth Screen Component ───
-function AuthScreen() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      if (isLogin) {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        if (res.ok) {
-          window.location.reload();
-        } else {
-          const data = await res.json();
-          setError(data.error || "Invalid email or password");
-        }
-      } else {
-        const res = await fetch("/api/auth/signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, name }),
-        });
-        if (res.ok) {
-          // Now sign in
-          const loginRes = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-          });
-          if (loginRes.ok) {
-            window.location.reload();
-          } else {
-            setError("Account created! Please sign in.");
-            setIsLogin(true);
-          }
-        } else {
-          const data = await res.json();
-          setError(data.error || "Signup failed");
-        }
-      }
-    } catch {
-      setError("Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950 p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
-        <div className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-            className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-200 dark:shadow-emerald-900/50"
-          >
-            <Wallet className="w-10 h-10 text-white" />
-          </motion.div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-            Smart Budget Tracker
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Stay within your budget, every single day
-          </p>
-        </div>
-
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border-white/20 dark:border-gray-800/50 shadow-2xl">
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex gap-2 mb-6 bg-muted rounded-xl p-1">
-                <button
-                  type="button"
-                  onClick={() => { setIsLogin(true); setError(""); }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                    isLogin ? "bg-white dark:bg-gray-800 shadow-sm" : "text-muted-foreground"
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsLogin(false); setError(""); }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                    !isLogin ? "bg-white dark:bg-gray-800 shadow-sm" : "text-muted-foreground"
-                  }`}
-                >
-                  Sign Up
-                </button>
-              </div>
-
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="rounded-xl"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder={isLogin ? "Enter password" : "At least 6 characters"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="rounded-xl"
-                />
-              </div>
-
-              {error && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-sm text-destructive bg-destructive/10 p-3 rounded-xl"
-                >
-                  {error}
-                </motion.p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30"
-                disabled={loading}
-              >
-                {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
-  );
 }
 
 // ─── Stat Card Component ───
@@ -1472,8 +1301,29 @@ function MainApp() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
+  // Auto-login: create default user if not authenticated
   useEffect(() => {
-    checkAuth();
+    const autoLogin = async () => {
+      try {
+        const res = await fetch("/api/auth/auto-login", { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user) {
+            // Update store with authenticated user
+            const state = useAppStore.getState();
+            (state as any).isAuthenticated = true;
+            (state as any).isLoading = false;
+            (state as any).user = { id: data.user.id, email: data.user.email, name: data.user.name || "" };
+          }
+        }
+      } catch (error) {
+        console.error("Auto-login error:", error);
+      }
+    };
+
+    if (!isAuthenticated) {
+      autoLogin();
+    }
   }, []);
 
   useEffect(() => {
@@ -1485,7 +1335,7 @@ function MainApp() {
     }
   }, [isAuthenticated, selectedMonth, selectedYear]);
 
-  if (isLoading) {
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950">
         <motion.div
@@ -1495,10 +1345,6 @@ function MainApp() {
         />
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    return <AuthScreen />;
   }
 
   const tabs: { id: ViewTab; label: string; icon: any }[] = [
@@ -1537,17 +1383,7 @@ function MainApp() {
                 {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-xl"
-              onClick={async () => {
-                await fetch("/api/auth/logout", { method: "POST" });
-                window.location.reload();
-              }}
-            >
-              <LogOut className="w-5 h-5" />
-            </Button>
+
           </div>
         </div>
       </header>

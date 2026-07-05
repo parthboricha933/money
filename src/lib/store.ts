@@ -123,7 +123,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   login: async (email, password) => {
     try {
-      const res = await fetch("/api/auth/signin", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -153,7 +153,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   logout: async () => {
     try {
-      await fetch("/api/auth/signout", { method: "POST" });
+      await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       set({
         isAuthenticated: false,
