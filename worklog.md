@@ -92,3 +92,26 @@ Stage Summary:
 - GitHub: https://github.com/parthboricha933/money
 - Vercel: https://my-project-three-pink-18.vercel.app
 - All APIs tested and working on production
+
+---
+Task ID: 12
+Agent: Main Agent
+Task: Remove login panel and rename Vercel project to "money"
+
+Work Log:
+- Created /api/auth/auto-login route that creates a default user (default@budget.app) automatically
+- Removed AuthScreen component from page.tsx entirely
+- Modified MainApp to call auto-login on startup instead of showing login screen
+- Removed logout button from header
+- Removed LogOut icon import
+- Fixed Zustand store endpoint mismatches (signin→login, signout→logout)
+- Changed Vercel project name from "my-project" to "money" in .vercel/project.json
+- Committed and pushed changes to GitHub (repo: parthboricha933/money)
+- Build successful, auto-login API tested and working
+- Vercel deployment pending (token not available in session - needs manual redeploy)
+
+Stage Summary:
+- Login panel completely removed - app auto-creates default user and auto-logs in
+- GitHub repo updated: https://github.com/parthboricha933/money
+- Vercel project renamed to "money" locally, needs to be updated in Vercel dashboard
+- User needs to manually trigger redeploy on Vercel or provide Vercel token
