@@ -1292,7 +1292,7 @@ function MainApp() {
     selectedMonth, selectedYear,
     showAddExpense, setShowAddExpense,
     fetchBudget, fetchExpenses, fetchAnalytics, fetchNotifications,
-    checkAuth, isAuthenticated, isLoading,
+    autoLogin, isAuthenticated, isLoading,
     budget,
   } = useAppStore();
   const { theme, setTheme } = useTheme();
@@ -1303,25 +1303,7 @@ function MainApp() {
 
   // Auto-login: create default user if not authenticated
   useEffect(() => {
-    const autoLogin = async () => {
-      try {
-        const res = await fetch("/api/auth/auto-login", { method: "POST" });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.user) {
-            // Update store with authenticated user
-            const state = useAppStore.getState();
-            (state as any).isAuthenticated = true;
-            (state as any).isLoading = false;
-            (state as any).user = { id: data.user.id, email: data.user.email, name: data.user.name || "" };
-          }
-        }
-      } catch (error) {
-        console.error("Auto-login error:", error);
-      }
-    };
-
-    if (!isAuthenticated) {
+    if (!isAuthenticated && isLoading) {
       autoLogin();
     }
   }, []);

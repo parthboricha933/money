@@ -83,6 +83,7 @@ interface AppState {
   filterCategory: string;
 
   // Actions
+  autoLogin: () => Promise<void>;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -120,6 +121,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   editingExpense: null,
   searchQuery: "",
   filterCategory: "all",
+
+  autoLogin: async () => {
+    try {
+      const res = await fetch("/api/auth/auto-login", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.user) {
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            user: { id: data.user.id, email: data.user.email, name: data.user.name || "" },
+          });
+        } else {
+          set({ isLoading: false });
+        }
+      } else {
+        set({ isLoading: false });
+      }
+    } catch {
+      set({ isLoading: false });
+    }
+  },
 
   login: async (email, password) => {
     try {
